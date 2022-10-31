@@ -5,5 +5,6 @@ import (
 )
 
 func main() {
-	capture.GetPcapFiles("any")
+	capture.GetPcapFiles("esc", "Qualcomm QCA9377 802.11ac Wireless Adapter")
+	// capture.GetPcapFiles("esc", "any")
 }

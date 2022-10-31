@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -16,14 +16,17 @@ import (
 	hook "github.com/robotn/gohook"
 )
 
-var Stop bool = false
+var (
+	Stop         bool   = false
+	PacketLength uint32 = 10240
+)
 
-func GetPcapFiles(names ...string) {
-	go setStopKey("esc")
+func GetPcapFiles(stopKey string, names ...string) {
+	go setStopKey(stopKey)
 	var wg sync.WaitGroup
-	for i, d := range getNetDeviceHandles(names...) {
+	for device, handle := range getNetDeviceHandles(names...) {
 		wg.Add(1)
-		go getPackets(d, strconv.Itoa(i), &wg)
+		go getPackets(handle, device, &wg)
 	}
 	wg.Wait()
 }
@@ -35,34 +38,45 @@ func setStopKey(key string) {
 	}
 }
 
-func getNetDeviceHandles(names ...string) []*pcap.Handle {
+func getNetDeviceHandles(names ...string) map[string]*pcap.Handle {
 	devices, err := pcap.FindAllDevs()
 	if err != nil {
 		log.Fatal(err)
 	}
-	if names[0] == "any" {
-		names = nil
-		for i, device := range devices {
-			names = append(names, device.Name)
-			fmt.Println("\nName: ", strconv.Itoa(i)+" "+device.Name)
-			fmt.Println("Description: ", device.Description)
-			for _, address := range device.Addresses {
-				fmt.Println("- IP address: ", address.IP)
-				fmt.Println("- Subnet mask: ", address.Netmask)
+	var pIs []pcap.Interface
+	for _, device := range devices {
+		// fmt.Println("\nName: ", strconv.Itoa(i)+" "+device.Name)
+		fmt.Println("\nDescription: ", device.Description)
+		for _, address := range device.Addresses {
+			fmt.Println("- IP address: ", address.IP)
+			fmt.Println("- Subnet mask: ", address.Netmask)
+		}
+		if names[0] == "any" {
+			pIs = append(pIs, device)
+		} else {
+			for _, name := range names {
+				if strings.Contains(device.Description, name) {
+					pIs = append(pIs, device)
+					break
+				}
 			}
 		}
 	}
-	// todo 使用设备全称编写
-	var Handles []*pcap.Handle
-	for _, device := range names {
-		// Open the device for capturing
-		handle, err := pcap.OpenLive(device, 1024, false, 5)
-		if err != nil {
-			log.Fatalf("Error opening device %s: %v", device, err)
-		}
-		Handles = append(Handles, handle)
+
+	if len(pIs) == 0 {
+		log.Fatalln("opening nothing, need device")
 	}
-	return Handles
+
+	var mapHandles = make(map[string]*pcap.Handle)
+	for _, device := range pIs {
+		// Open the device for capturing
+		handle, err := pcap.OpenLive(device.Name, int32(PacketLength), false, 5)
+		if err != nil {
+			log.Fatalf("Error opening device %s: %v", device.Description, err)
+		}
+		mapHandles[device.Description] = handle
+	}
+	return mapHandles
 }
 
 func getPackets(handle *pcap.Handle, pcapFile string, wg *sync.WaitGroup) {
@@ -75,7 +89,7 @@ func getPackets(handle *pcap.Handle, pcapFile string, wg *sync.WaitGroup) {
 	f, _ := os.Create(pcapFile)
 	defer f.Close()
 	writer := pcapgo.NewWriter(f)
-	writer.WriteFileHeader(1024, layers.LinkTypeEthernet)
+	writer.WriteFileHeader(PacketLength, layers.LinkTypeEthernet)
 
 	// Start processing packets
 	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
