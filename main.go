@@ -1,10 +1,18 @@
 package main
 
 import (
+	"flag"
+
 	"github.com/hu7433438/packetultra/capture"
 )
 
+var (
+	stopKey = *flag.String("s", "esc", "stopKey")
+	devices = *flag.String("d", "any", "devices des")
+)
+
 func main() {
-	capture.GetPcapFiles("esc", "Qualcomm QCA9377 802.11ac Wireless Adapter")
-	// capture.GetPcapFiles("esc", "any")
+	flag.Parse()
+	// capture.GetPcapFiles("esc", "Qualcomm QCA9377 802.11ac Wireless Adapter")
+	capture.GetPcapFiles(stopKey, devices)
 }
