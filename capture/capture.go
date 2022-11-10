@@ -17,8 +17,8 @@ import (
 )
 
 var (
-	Stop         bool   = false
-	PacketLength uint32 = 10240
+	IsWritePacket bool   = true
+	PacketLength  uint32 = 10240
 )
 
 func GetPcapFiles(stopKey string, names ...string) {
@@ -34,8 +34,16 @@ func GetPcapFiles(stopKey string, names ...string) {
 func setStopKey(key string) {
 	ok := hook.AddEvents(key)
 	if ok {
-		Stop = true
+		IsWritePacket = false
 	}
+}
+
+func getHandle(device pcap.Interface) *pcap.Handle {
+	handle, err := pcap.OpenLive(device.Name, int32(PacketLength), false, 5)
+	if err != nil {
+		log.Fatalf("Error opening device %s: %v", device.Description, err)
+	}
+	return handle
 }
 
 func getNetDeviceHandles(names ...string) map[string]*pcap.Handle {
@@ -43,39 +51,29 @@ func getNetDeviceHandles(names ...string) map[string]*pcap.Handle {
 	if err != nil {
 		log.Fatal(err)
 	}
-	var pIs []pcap.Interface
+	var mapHandles = make(map[string]*pcap.Handle)
 	for _, device := range devices {
-		// fmt.Println("\nName: ", strconv.Itoa(i)+" "+device.Name)
 		fmt.Println("\nDescription: ", device.Description)
 		for _, address := range device.Addresses {
 			fmt.Println("- IP address: ", address.IP)
 			fmt.Println("- Subnet mask: ", address.Netmask)
 		}
 		if names[0] == "any" {
-			pIs = append(pIs, device)
+			mapHandles[device.Description] = getHandle(device)
 		} else {
 			for _, name := range names {
 				if strings.Contains(device.Description, name) {
-					pIs = append(pIs, device)
+					mapHandles[device.Description] = getHandle(device)
 					break
 				}
 			}
 		}
 	}
 
-	if len(pIs) == 0 {
+	if len(mapHandles) == 0 {
 		log.Fatalln("opening nothing, need device")
 	}
 
-	var mapHandles = make(map[string]*pcap.Handle)
-	for _, device := range pIs {
-		// Open the device for capturing
-		handle, err := pcap.OpenLive(device.Name, int32(PacketLength), false, 5)
-		if err != nil {
-			log.Fatalf("Error opening device %s: %v", device.Description, err)
-		}
-		mapHandles[device.Description] = handle
-	}
 	return mapHandles
 }
 
@@ -90,12 +88,10 @@ func getPackets(handle *pcap.Handle, pcapFile string, wg *sync.WaitGroup) {
 	defer f.Close()
 	writer := pcapgo.NewWriter(f)
 	writer.WriteFileHeader(PacketLength, layers.LinkTypeEthernet)
-
-	// Start processing packets
 	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
 
 Write:
-	for !Stop {
+	for IsWritePacket {
 		select {
 		case packet := <-packetSource.Packets():
 			fmt.Println(packet)
