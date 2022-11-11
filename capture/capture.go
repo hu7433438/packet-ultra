@@ -17,7 +17,7 @@ import (
 )
 
 var (
-	IsWritePacket bool   = true
+	WritePacketOn bool   = true
 	PacketLength  uint32 = 10240
 )
 
@@ -34,7 +34,7 @@ func GetPcapFiles(stopKey string, names ...string) {
 func setStopKey(key string) {
 	ok := hook.AddEvents(key)
 	if ok {
-		IsWritePacket = false
+		WritePacketOn = false
 	}
 }
 
@@ -91,7 +91,7 @@ func getPackets(handle *pcap.Handle, pcapFile string, wg *sync.WaitGroup) {
 	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
 
 Write:
-	for IsWritePacket {
+	for WritePacketOn {
 		select {
 		case packet := <-packetSource.Packets():
 			fmt.Println(packet)

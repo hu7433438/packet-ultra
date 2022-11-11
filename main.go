@@ -8,11 +8,11 @@ import (
 
 var (
 	stopKey = flag.String("s", "esc", "stopKey")
-	devices = flag.String("d", "any", "devices des")
+	device  = flag.String("d", "any", "devices des")
 )
 
 func main() {
 	flag.Parse()
 	// capture.GetPcapFiles("esc", "Qualcomm QCA9377 802.11ac Wireless Adapter")
-	capture.GetPcapFiles(*stopKey, *devices)
+	capture.GetPcapFiles(*stopKey, *device)
 }
