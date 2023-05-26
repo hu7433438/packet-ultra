@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path"
 	"strings"
 	"sync"
 	"time"
@@ -21,12 +22,16 @@ var (
 	PacketLength  uint32 = 10240
 )
 
-func GetPcapFiles(stopKey string, names ...string) {
+func GetPcapFiles(stopKey string, pcapPath string, names ...string) {
 	go setStopKey(stopKey)
 	var wg sync.WaitGroup
+
+	if !utils.Exists(pcapPath) {
+		os.Mkdir(pcapPath, 0777)
+	}
 	for device, handle := range getNetDeviceHandles(names...) {
 		wg.Add(1)
-		go getPackets(handle, device, &wg)
+		go getPackets(handle, path.Join(pcapPath, device), &wg)
 	}
 	wg.Wait()
 }
@@ -84,7 +89,7 @@ func getPackets(handle *pcap.Handle, pcapFile string, wg *sync.WaitGroup) {
 		os.Remove(pcapFile)
 	}
 
-	f, _ := os.Create(pcapFile)
+	f, _ := os.OpenFile(pcapFile, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0777)
 	defer f.Close()
 	writer := pcapgo.NewWriter(f)
 	writer.WriteFileHeader(PacketLength, layers.LinkTypeEthernet)
