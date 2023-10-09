@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"path"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -58,17 +59,27 @@ func getNetDeviceHandles(names ...string) map[string]*pcap.Handle {
 	}
 	var mapHandles = make(map[string]*pcap.Handle)
 	for _, device := range devices {
-		fmt.Println("\nDescription: ", device.Description)
+
+		fmt.Println("\nName: ", device.Name)
+		fmt.Println("Description: ", device.Description)
+
+		var mark string
+		if runtime.GOOS == "windows" {
+			mark = device.Description
+		} else {
+			mark = device.Name
+		}
+
 		for _, address := range device.Addresses {
 			fmt.Println("- IP address: ", address.IP)
 			fmt.Println("- Subnet mask: ", address.Netmask)
 		}
 		if names[0] == "any" {
-			mapHandles[device.Description] = getHandle(device)
+			mapHandles[mark] = getHandle(device)
 		} else {
 			for _, name := range names {
-				if strings.Contains(device.Description, name) {
-					mapHandles[device.Description] = getHandle(device)
+				if strings.Contains(mark, name) {
+					mapHandles[mark] = getHandle(device)
 					break
 				}
 			}
